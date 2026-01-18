@@ -27,7 +27,7 @@ export const sendSms = async ({ to, code }: { to: string; code: string }) => {
           "client-id": process.env.VATANSMS_CLIENT_ID,
           "client-secret": process.env.VATANSMS_SECRET_ID
         },
-        timeout: 10000, // 10 saniye timeout
+        timeout: 60000,
       }
     );
 
