@@ -2,7 +2,7 @@
 
 name = "COD Verification"
 client_id = "b6cfc3b5c751c0e67e4853f7b98b982d" # Shopify Partner Dashboard'dan alınacak
-application_url = "https://79f18b2df442.ngrok-free.app"
+application_url = "https://api2.gustoapp.net"
 embedded = true
 
 [access_scopes]
@@ -10,7 +10,7 @@ scopes = "write_products,write_orders,read_customers,write_customers,write_draft
 
 [auth]
 redirect_urls = [
-  "https://79f18b2df442.ngrok-free.app/api/auth/callback"
+  "https://api2.gustoapp.net/api/auth/callback"
 ]
 
 [webhooks]
@@ -25,7 +25,7 @@ topics = ["app/uninstalled"]
 uri = "/api/webhooks/app/uninstalled"
 
 [app_proxy]
-url = "https://79f18b2df442.ngrok-free.app"
+url = "https://api2.gustoapp.net"
 subpath = "cod"
 prefix = "apps"
 

@@ -13,8 +13,8 @@ Bu rehber, uygulamanızı gerçek bir Shopify mağazasında test etmeniz için a
 ### 2. Mevcut Durumunuz
 Ekran görüntüsüne göre:
 - ✅ App oluşturulmuş: "COD Verification"
-- ✅ App URL: `https://79f18b2df442.ngrok-free.app`
-- ✅ Redirect URL: `https://79f18b2df442.ngrok-free.app/api/auth/callback`
+- ✅ App URL: `https://api2.gustoapp.net`
+- ✅ Redirect URL: `https://api2.gustoapp.net/api/auth/callback`
 - ✅ Scopes: `read_checkouts, read_orders, write_orders`
 - ✅ Released: Jan 13, 2026 at 1:25 AM UTC
 
@@ -37,7 +37,7 @@ Yeni bir terminal açın:
 ngrok http 3000
 ```
 
-ngrok size bir URL verecek (örn: `https://79f18b2df442.ngrok-free.app`)
+ngrok size bir URL verecek (örn: `https://api2.gustoapp.net`)
 
 **ÖNEMLİ:** Bu URL'i `.env` ve `.env.local` dosyalarında güncelleyin:
 ```env

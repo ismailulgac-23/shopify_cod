@@ -69,7 +69,7 @@ https://your-ngrok-url.ngrok-free.app/api/auth?shop=your-store.myshopify.com
 
 **Örnek:**
 ```
-https://79f18b2df442.ngrok-free.app/api/auth?shop=test-store-123.myshopify.com
+https://api2.gustoapp.net/api/auth?shop=test-store-123.myshopify.com
 ```
 
 ### Adımlar:
