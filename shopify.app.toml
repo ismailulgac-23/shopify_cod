@@ -1,0 +1,33 @@
+# Shopify App Configuration
+
+name = "COD Verification"
+client_id = "b6cfc3b5c751c0e67e4853f7b98b982d" # Shopify Partner Dashboard'dan alınacak
+application_url = "https://79f18b2df442.ngrok-free.app"
+embedded = true
+
+[access_scopes]
+scopes = "write_products,write_orders,read_customers,write_customers,write_draft_orders,read_draft_orders,write_marketing_events,read_marketing_events,read_checkouts"
+
+[auth]
+redirect_urls = [
+  "https://79f18b2df442.ngrok-free.app/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2026-01"
+
+[[webhooks.subscriptions]]
+topics = ["orders/create"]
+uri = "/api/webhooks/orders/create"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/api/webhooks/app/uninstalled"
+
+[app_proxy]
+url = "https://79f18b2df442.ngrok-free.app"
+subpath = "cod"
+prefix = "apps"
+
+[pos]
+embedded = false
