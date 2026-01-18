@@ -14,6 +14,7 @@ export const sendSms = async ({ to, code }: { to: string; code: string }) => {
 
     console.log('📱 SMS gönderiliyor:', phoneWithCountryCode);
 
+
     const { data } = await axios.post(
       "https://api.vatansms.net/api/whatsapp/v1/messages/send",
       {

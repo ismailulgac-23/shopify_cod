@@ -233,11 +233,11 @@ export async function GET(request: NextRequest) {
             shopId
         );
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Meta OAuth callback hatası:', error);
         return createPopupResponse(
             false,
-            'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.'
+            'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.'+error.toString()
         );
 
     } finally {
