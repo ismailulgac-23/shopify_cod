@@ -20,7 +20,7 @@ export const sendSms = async ({ to, code }: { to: string; code: string }) => {
         reg_id: process.env.VATANSMS_DEVICE_ID,
         to: phoneWithCountryCode,
         message: message,
-        send_speed: process.env.VATANSMS_SEND_SPEED || "1",
+        send_speed: process.env.VATANSMS_SEND_SPEED || "2",
       },
       {
         headers: {
