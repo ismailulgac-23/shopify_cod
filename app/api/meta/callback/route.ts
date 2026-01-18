@@ -3,6 +3,9 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Next.js'e bu route'un dinamik olduğunu belirt
+export const dynamic = 'force-dynamic';
+
 /**
  * Helper: Popup penceresi için HTML response oluştur
  */
