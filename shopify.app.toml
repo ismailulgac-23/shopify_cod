@@ -1,7 +1,7 @@
 # Shopify App Configuration
 
-name = "COD Verification"
-client_id = "b6cfc3b5c751c0e67e4853f7b98b982d" # Shopify Partner Dashboard'dan alınacak
+name = "Maisoonmaiav2"
+client_id = "34134817333bcdcc3e43d644d8c8dc44" # Shopify Partner Dashboard'dan alınacak
 application_url = "https://api2.gustoapp.net"
 embedded = true
 

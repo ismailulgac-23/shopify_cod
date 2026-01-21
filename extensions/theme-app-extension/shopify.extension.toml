@@ -3,13 +3,13 @@ api_version = "2026-01"
 [[extensions]]
 uid = "4ad141bc-f62b-3fcc-8c54-586faabb348444fbbb00"
 type = "theme_app_extension"
-name = "COD WhatsApp Interceptor"
-handle = "cod-whatsapp-interceptor"
+name = "MaisoonmaiaV2"
+handle = "maisoonmaiav2"
 
 [extensions.settings]
 [[extensions.settings.blocks]]
 type = "app-block"
-name = "COD Interceptor"
+name = "MaisoonmaiaV2"
 
 [[extensions.settings.blocks.settings]]
 type = "checkbox"
