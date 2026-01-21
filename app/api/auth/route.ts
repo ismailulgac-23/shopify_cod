@@ -1,3 +1,4 @@
+import { getEnv } from '@/app/config';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -8,7 +9,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const apiKey = shop == 'm2gtzh-yv.myshopify.com' ? process.env.SHOPIFY_API_KEY_MAIS : process.env.SHOPIFY_API_KEY;
+    const apiKey = getEnv(shop).key;
     const scopes = process.env.SHOPIFY_SCOPES || 'read_orders,write_orders';
     const redirectUri = `${process.env.SHOPIFY_APP_URL}/api/auth/callback`;
     
