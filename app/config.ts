@@ -1,4 +1,4 @@
-export const getEnv = ({ shop = undefined }: any) => {
+export const getEnv = (shop: any = undefined) => {
   if (shop == "m2gtzh-yv.myshopify.com") {
     return {
       key: process.env.SHOPIFY_API_KEY_MAIS,
