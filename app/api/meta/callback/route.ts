@@ -1,249 +1,195 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import dns from 'dns';
+
+dns.setDefaultResultOrder('ipv4first');
 
 const prisma = new PrismaClient();
-
-// Next.js'e bu route'un dinamik olduğunu belirt
 export const dynamic = 'force-dynamic';
 
-/**
- * Helper: Popup penceresi için HTML response oluştur
- */
-function createPopupResponse(success: boolean, message: string, shopId?: string) {
-    const bgColor = success
-        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-        : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
-    const icon = success ? '✓' : '✗';
-    const title = success ? 'Meta Hesabı Bağlandı!' : 'Bağlantı Başarısız';
+/* ===============================
+   SAFE FETCH
+================================ */
+async function safeFetch(url: string, options: RequestInit = {}, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>${title}</title>
-        <meta charset="UTF-8">
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background: ${bgColor};
-            color: white;
-          }
-          .container {
-            text-align: center;
-            padding: 40px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            max-width: 400px;
-          }
-          .icon {
-            font-size: 64px;
-            margin-bottom: 20px;
-          }
-          h1 {
-            margin: 0 0 10px 0;
-            font-size: 24px;
-          }
-          p {
-            margin: 0;
-            opacity: 0.9;
-            font-size: 14px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="icon">${icon}</div>
-          <h1>${title}</h1>
-          <p>${message}</p>
-          <p style="margin-top: 10px;">Bu pencere otomatik olarak kapanacak...</p>
-        </div>
-        <script>
-          // Ana pencereye mesaj gönder
-          if (window.opener) {
-            window.opener.postMessage({
-              type: '${success ? 'META_OAUTH_SUCCESS' : 'META_OAUTH_ERROR'}',
-              message: '${message}',
-              ${shopId ? `shopId: '${shopId}'` : ''}
-            }, window.location.origin);
-            
-            // 2 saniye sonra pencereyi kapat
-            setTimeout(() => {
-              window.close();
-            }, 2000);
-          } else {
-            // Fallback: Eğer opener yoksa ana sayfaya yönlendir
-            setTimeout(() => {
-              window.location.href = '/?meta_error=' + encodeURIComponent('${message}');
-            }, 2000);
-          }
-        </script>
-      </body>
-    </html>
-  `;
-
-    return new NextResponse(html, {
-        headers: {
-            'Content-Type': 'text/html',
-        },
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal,
     });
+
+    const text = await res.text();
+    let data: any;
+
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
+    }
+
+    return {
+      ok: res.ok,
+      status: res.status,
+      data,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
-/**
- * Meta OAuth callback endpoint'i
- * Facebook'tan dönen authorization code'u access token'a çevirir
- * ve veritabanına kaydeder
- */
+/* ===============================
+   POPUP RESPONSE
+================================ */
+function createPopupResponse(success: boolean, message: string, shopId?: string) {
+  const bg = success
+    ? 'linear-gradient(135deg,#667eea,#764ba2)'
+    : 'linear-gradient(135deg,#f093fb,#f5576c)';
 
+  return new NextResponse(
+    `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${success ? 'Başarılı' : 'Hata'}</title>
+<style>
+body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
+background:${bg};color:#fff;font-family:sans-serif}
+.box{background:rgba(255,255,255,.15);padding:40px;border-radius:16px;text-align:center}
+</style>
+</head>
+<body>
+<div class="box">
+<h2>${message}</h2>
+<p>Bu pencere otomatik kapanacaktır</p>
+</div>
+<script>
+if(window.opener){
+  window.opener.postMessage({
+    type:'${success ? 'META_OAUTH_SUCCESS' : 'META_OAUTH_ERROR'}',
+    message:'${message}',
+    ${shopId ? `shopId:'${shopId}',` : ''}
+  },'*');
+  setTimeout(()=>window.close(),2000);
+}
+</script>
+</body>
+</html>`,
+    { headers: { 'Content-Type': 'text/html' } }
+  );
+}
+
+/* ===============================
+   CALLBACK
+================================ */
 export async function GET(request: NextRequest) {
-    try {
-        const searchParams = request.nextUrl.searchParams;
-        const code = searchParams.get('code');
-        const state = searchParams.get('state');
-        const error = searchParams.get('error');
+  try {
+    const params = request.nextUrl.searchParams;
+    const code = params.get('code');
+    const state = params.get('state');
+    const error = params.get('error');
 
-        // OAuth hata kontrolü
-        if (error) {
-            console.error('Meta OAuth hatası:', error);
-            return createPopupResponse(
-                false,
-                'Meta OAuth yetkilendirmesi iptal edildi veya başarısız oldu.'
-            );
-        }
-
-
-        if (!code || !state) {
-            return createPopupResponse(
-                false,
-                'Geçersiz OAuth callback parametreleri.'
-            );
-        }
-
-
-        // State'i decode et
-        const decodedState = JSON.parse(Buffer.from(state, 'base64').toString());
-        const { shopId } = decodedState;
-
-        if (!shopId) {
-            return createPopupResponse(
-                false,
-                'Geçersiz state parametresi. Lütfen tekrar deneyin.'
-            );
-        }
-
-
-        // Access token al
-        const tokenUrl = new URL('https://graph.facebook.com/v18.0/oauth/access_token');
-        tokenUrl.searchParams.set('client_id', process.env.META_APP_ID!);
-        tokenUrl.searchParams.set('client_secret', process.env.META_APP_SECRET!);
-        tokenUrl.searchParams.set('redirect_uri', process.env.META_REDIRECT_URI!);
-        tokenUrl.searchParams.set('code', code);
-
-        const tokenResponse = await fetch(tokenUrl.toString());
-        const tokenData = await tokenResponse.json();
-
-        if (!tokenResponse.ok || !tokenData.access_token) {
-            console.error('Token alma hatası:', tokenData);
-            return createPopupResponse(
-                false,
-                'Meta access token alınamadı. Lütfen tekrar deneyin.'
-            );
-        }
-
-
-        const { access_token, expires_in } = tokenData;
-
-        // Long-lived token al
-        const longLivedTokenUrl = new URL('https://graph.facebook.com/v18.0/oauth/access_token');
-        longLivedTokenUrl.searchParams.set('grant_type', 'fb_exchange_token');
-        longLivedTokenUrl.searchParams.set('client_id', process.env.META_APP_ID!);
-        longLivedTokenUrl.searchParams.set('client_secret', process.env.META_APP_SECRET!);
-        longLivedTokenUrl.searchParams.set('fb_exchange_token', access_token);
-
-        const longLivedResponse = await fetch(longLivedTokenUrl.toString());
-        const longLivedData = await longLivedResponse.json();
-
-        const finalToken = longLivedData.access_token || access_token;
-        const tokenExpiry = expires_in
-            ? new Date(Date.now() + expires_in * 1000)
-            : null;
-
-        // Business Account ID'yi al (pixel'lere erişim için gerekli)
-        // Önce kullanıcının business'larını sorgula
-        const businessesUrl = `https://graph.facebook.com/v18.0/me/businesses?fields=id,name&access_token=${finalToken}`;
-        const businessesResponse = await fetch(businessesUrl);
-        const businessesData = await businessesResponse.json();
-
-        let businessAccountId = null;
-
-        if (businessesResponse.ok && businessesData.data && businessesData.data.length > 0) {
-            // İlk business'ı kullan
-            businessAccountId = businessesData.data[0].id;
-            console.log('Business account bulundu:', businessesData.data[0]);
-        } else {
-            // Business yoksa, ad account'ları dene
-            console.log('Business bulunamadı, ad account deneniyor...');
-            const adAccountsUrl = `https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name&access_token=${finalToken}`;
-            const adAccountsResponse = await fetch(adAccountsUrl);
-            const adAccountsData = await adAccountsResponse.json();
-
-            if (adAccountsResponse.ok && adAccountsData.data && adAccountsData.data.length > 0) {
-                // İlk ad account'u kullan (act_ prefix'ini kaldır)
-                businessAccountId = adAccountsData.data[0].id.replace('act_', '');
-                console.log('Ad account bulundu:', adAccountsData.data[0]);
-            }
-        }
-
-        if (!businessAccountId) {
-            console.error('Ne business ne de ad account bulunamadı');
-            return createPopupResponse(
-                false,
-                'Meta hesabınızda business veya ad account bulunamadı. Lütfen Meta Business Manager\'da bir business oluşturun.'
-            );
-        }
-
-
-
-        // Veritabanına kaydet veya güncelle
-        await prisma.metaIntegration.upsert({
-            where: { shopId },
-            create: {
-                shopId,
-                metaBusinessAccountId: businessAccountId,
-                metaAccessToken: finalToken,
-                metaTokenExpiry: tokenExpiry,
-                isActive: true,
-            },
-            update: {
-                metaBusinessAccountId: businessAccountId,
-                metaAccessToken: finalToken,
-                metaTokenExpiry: tokenExpiry,
-                isActive: true,
-                updatedAt: new Date(),
-            },
-        });
-
-
-        // Başarılı - Popup penceresinde ana pencereye mesaj gönder ve kapat
-        return createPopupResponse(
-            true,
-            'Meta hesabınız başarıyla bağlandı. Şimdi pixellerinizi yönetebilirsiniz.',
-            shopId
-        );
-
-    } catch (error: any) {
-        console.error('Meta OAuth callback hatası:', error);
-        return createPopupResponse(
-            false,
-            'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.'+error.toString()
-        );
-
-    } finally {
-        await prisma.$disconnect();
+    if (error) {
+      return createPopupResponse(false, 'Meta yetkilendirme iptal edildi.');
     }
+
+    if (!code || !state) {
+      return createPopupResponse(false, 'Geçersiz OAuth parametreleri.');
+    }
+
+    const decoded = JSON.parse(Buffer.from(state, 'base64').toString());
+    const shopId = decoded?.shopId;
+
+    if (!shopId) {
+      return createPopupResponse(false, 'Geçersiz state parametresi.');
+    }
+
+    /* ACCESS TOKEN */
+    const tokenUrl = new URL('https://graph.facebook.com/v18.0/oauth/access_token');
+    tokenUrl.searchParams.set('client_id', process.env.META_APP_ID!);
+    tokenUrl.searchParams.set('client_secret', process.env.META_APP_SECRET!);
+    tokenUrl.searchParams.set('redirect_uri', process.env.META_REDIRECT_URI!);
+    tokenUrl.searchParams.set('code', code);
+
+    const tokenRes = await safeFetch(tokenUrl.toString());
+
+    if (!tokenRes.ok || !tokenRes.data.access_token) {
+      return createPopupResponse(false, 'Meta access token alınamadı.');
+    }
+
+    const accessToken = tokenRes.data.access_token;
+
+    /* LONG LIVED TOKEN */
+    const longUrl = new URL('https://graph.facebook.com/v18.0/oauth/access_token');
+    longUrl.searchParams.set('grant_type', 'fb_exchange_token');
+    longUrl.searchParams.set('client_id', process.env.META_APP_ID!);
+    longUrl.searchParams.set('client_secret', process.env.META_APP_SECRET!);
+    longUrl.searchParams.set('fb_exchange_token', accessToken);
+
+    const longRes = await safeFetch(longUrl.toString());
+    const finalToken = longRes.data?.access_token || accessToken;
+
+    /* BUSINESS / AD ACCOUNT */
+    let businessId: string | null = null;
+
+    const bizRes = await safeFetch(
+      `https://graph.facebook.com/v18.0/me/businesses?access_token=${finalToken}`
+    );
+
+    if (bizRes.ok && bizRes.data?.data?.length) {
+      businessId = bizRes.data.data[0].id;
+    } else {
+      const adRes = await safeFetch(
+        `https://graph.facebook.com/v18.0/me/adaccounts?access_token=${finalToken}`
+      );
+
+      if (adRes.ok && adRes.data?.data?.length) {
+        businessId = adRes.data.data[0].id.replace('act_', '');
+      }
+    }
+
+    if (!businessId) {
+      return createPopupResponse(
+        false,
+        'Meta Business veya Ad Account bulunamadı.'
+      );
+    }
+
+    /* DB */
+    await prisma.metaIntegration.upsert({
+      where: { shopId },
+      create: {
+        shopId,
+        metaBusinessAccountId: businessId,
+        metaAccessToken: finalToken,
+        isActive: true,
+      },
+      update: {
+        metaBusinessAccountId: businessId,
+        metaAccessToken: finalToken,
+        isActive: true,
+        updatedAt: new Date(),
+      },
+    });
+
+    return createPopupResponse(
+      true,
+      'Meta hesabınız başarıyla bağlandı.',
+      shopId
+    );
+
+  } catch (err: any) {
+    console.error('Meta OAuth callback fatal error', {
+      message: err?.message,
+      cause: err?.cause,
+    });
+
+    return createPopupResponse(
+      false,
+      'Meta bağlantısı zaman aşımına uğradı. Lütfen tekrar deneyin.'
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
 }
